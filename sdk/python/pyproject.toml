@@ -1,12 +1,17 @@
 [project]
 name = "weir-sdk"
 version = "0.1.0"
-description = "Weir SDK: measure how items move through async pipelines"
+description = "Weir SDK: count items through async pipelines to find lost, stuck and slow ones"
 requires-python = ">=3.10"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 dependencies = []
+
+[project.urls]
+Homepage = "https://weirhq.com"
+Repository = "https://github.com/weir-hq/weir"
+Issues = "https://github.com/weir-hq/weir/issues"
 
 [dependency-groups]
 dev = ["pytest>=8"]

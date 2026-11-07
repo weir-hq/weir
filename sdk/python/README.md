@@ -1,113 +1,79 @@
-# Weir Python SDK
+# weir-sdk
 
-Measures how items move through an async pipeline: how many enter and leave each stage, how
-they leave, how old they are, and which ones are stuck. No dependencies.
+The Python SDK for [Weir](https://weirhq.com). Weir counts items as they move through an async
+pipeline (queues, batches, cron jobs) and shows which stage lost items, which items are stuck,
+and where the time goes.
+
+```bash
+pip install weir-sdk
+```
+
+Python 3.10+, no dependencies. The SDK sends to a Weir server; see the
+[repository](https://github.com/weir-hq/weir) to run one.
+
+## Usage
+
+Each step of your pipeline is a stage. Every item a stage receives leaves it with an outcome.
 
 ```python
 import weir
 
-weir.init(pipeline="orders")  # endpoint: $WEIR_ENDPOINT, then http://localhost:4100
+weir.init(pipeline="orders")
 enrich = weir.stage("enrich")
 
+# A Kafka consumer: read the context from the message, attach it to what you produce.
 with enrich.receive(weir.extract(msg.headers())) as item:
-    for line in explode(msg):
+    for line in split(msg):
         producer.produce("lines", line, headers=weir.inject(item.emit()))
 ```
 
-Environment variables:
+Where items enter the pipeline, start them without a context:
 
-| Variable | Effect |
-|---|---|
-| `WEIR_ENDPOINT` | Weir server URL, when `weir.init()` gets no `endpoint` |
-| `OTEL_SERVICE_NAME` | The reporting service's name |
-| `WEIR_DISABLED=1` | Kill switch: records and sends nothing. Your code keeps working unchanged, and contexts still propagate. |
+```python
+ingest = weir.stage("ingest")
 
-## The rules
-
-1. **Every item that enters a stage leaves it exactly once, with one outcome.** At the end of
-   the `with` block the item leaves with:
-   - the outcome you set: `item.done()`, `item.drop("reason")` or `item.error()`;
-   - otherwise `errored`, if an exception escaped;
-   - otherwise `passed` if it called `emit()`, and **`vanished`** if it did not. Vanished is
-     silent loss: nobody decided to drop the item, it just went nowhere.
-2. **An item never closed stays inside the stage.** It is reported as active, with its age
-   growing. That is how stuck items show up.
-3. **Ages count from birth.** The first stage stamps `event_time`, and it travels in the
-   `weirparent` header. So the age at each stage includes time waiting in queues and for crons.
-
-Together: for every stage, `items in = items out + items still inside`. When that does not
-hold on the server, items were lost somewhere Weir could not see.
-
-## How it works
-
-```
-your code     stage.receive() ─▶ Item ─▶ item.emit() ─▶ item leaves (with block ends)
-                    │                         │                │
-recorder.py   item_entered()           item_emitted()     item_left()
-              counts per stage for this window + the items inside each stage
-                    │
-                    │  every 5 s, on a background thread (runtime.py)
-                    ▼
-export.py     take_snapshot() ─▶ build_payload() ─▶ POST /ingest
+with ingest.receive(key=order["id"], event_time=order["created_at"]) as item:  # unix seconds
+    producer.produce("orders", order, headers=weir.inject(item.emit()))
 ```
 
-Nothing per item goes over the network: only counts, histograms and two gauges per stage, so
-the cost does not grow with traffic.
+When an item crosses something without headers, such as a database table, store the context
+as a string and read it back:
 
-The counts are **running totals** since the process started (cumulative, as in Prometheus and
-OpenTelemetry), never reset. The server subtracts each report from the previous one. So an
-export that fails loses nothing (the next one carries the same counts), an export delivered
-twice counts nothing twice, and a restarted process is detected by its new start time.
-
-| File | What it holds |
-|---|---|
-| `stage.py` | `Stage` and `Item`: everything pipeline code calls |
-| `context.py` | `Context`, the `weirparent` header, `extract()` / `inject()` |
-| `recorder.py` | Per-stage counts for the current window, and the items inside each stage |
-| `export.py` | Turns a snapshot into the `/ingest` JSON, and sends it |
-| `runtime.py` | The one global: configuration, the recorder, the exporter thread, fork and exit hooks |
-| `semconv.py` | Metric and attribute names, and the `Outcome` values, from `conventions/` |
-
-Dependencies only point down the table, except that `stage.py` reaches the recorder through
-`runtime`.
-
-## Changing things
-
-**Add a metric:**
-1. Define it in `conventions/metrics.yaml`.
-2. Add its name to `semconv.py` and to `server/semconv.go`. A test on each side fails until
-   all three match.
-3. Count it in `recorder.py`: a field on `StageCounts`, updated in one of the `item_*` methods.
-4. Send it in `export.py`: one more `points.append(...)` in `stage_points()`.
-5. Read it on the server, in `Counts.add` in `server/store.go`.
-
-**Support a new broker:** nothing in the SDK changes. Call `weir.extract()` on the headers you
-receive and attach `weir.inject(item.emit())` to what you send. For a hop with no headers,
-such as a database table, store `item.emit().header()` in a column and rebuild the context
-with `weir.Context.from_header()`.
-
-## Develop
-
-From the repo root:
-
-```bash
-make test-sdk     # tests
-make bench-sdk    # cost per message, no broker or network (bench/micro.py)
-make bench        # cost on a real Kafka consumer, with and without Weir (demo/bench/)
+```python
+row["weir"] = item.emit().header()  # writing stage
+ctx = weir.Context.from_header(row["weir"])  # reading stage
 ```
 
-## Overhead
+## Outcomes
 
-`make bench-sdk` on an M-series Mac, one message through `extract → receive → emit → inject → close`:
+When the `with` block ends, the item leaves the stage with:
 
-| | Per message |
+| Outcome | When |
 |---|---|
-| SDK on | ~3 µs |
-| `WEIR_DISABLED=1` | ~1.7 µs (parsing and building contexts still runs) |
-| An item inside a stage, not yet closed | ~210 bytes of memory |
+| `done` | You called `item.done()`, e.g. after writing to the sink |
+| `dropped` | You called `item.drop("reason")` |
+| `errored` | An exception escaped, or you called `item.error()` |
+| `passed` | It called `item.emit()` at least once |
+| `vanished` | None of the above: it went nowhere and nobody said why |
 
-That is 0.3% next to a handler doing 1 ms of work, or 3% of one core at 10k msg/s.
+An item that never leaves (its `with` block never ends) counts as stuck, and its age keeps
+growing. Call `stage.retried()` to count retries.
 
-On a real Kafka consumer (`make bench`, results in `demo/README.md`): about 4 µs of CPU per
-message, +0.5% CPU and −0.5% throughput next to a 1 ms handler, and under 1 KB/s of export
-traffic at any volume.
+## Configuration
+
+| Setting | Default |
+|---|---|
+| `weir.init(endpoint=...)` or `WEIR_ENDPOINT` | `http://localhost:4100` |
+| `OTEL_SERVICE_NAME` | `unknown_service:<executable>` |
+| `WEIR_DISABLED=1` | Off. When set, nothing is recorded or sent, and your code runs unchanged. |
+
+The SDK sends running totals every 5 seconds from a background thread. Nothing is sent per
+item. Cost: about 4 µs of CPU per message on a Kafka consumer, under 1 KB/s of traffic.
+
+## Links
+
+- [Weir repository](https://github.com/weir-hq/weir): server, scraper, demo
+- [weir-scraper](https://pypi.org/project/weir-scraper/): items waiting between stages
+- [Metric names](https://github.com/weir-hq/weir/tree/main/conventions), in OpenTelemetry
+  semantic-conventions format
+- License: Apache-2.0

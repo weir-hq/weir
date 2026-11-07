@@ -1,12 +1,17 @@
 [project]
 name = "weir-scraper"
 version = "0.1.0"
-description = "Weir scraper: reports items waiting between stages (Kafka topics, staging tables), with no code changes"
+description = "Weir scraper: items waiting between pipeline stages, in queues and staging tables"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
 dependencies = ["weir-sdk", "confluent-kafka>=2.6", "psycopg[binary]>=3.2"]
+
+[project.urls]
+Homepage = "https://weirhq.com"
+Repository = "https://github.com/weir-hq/weir"
+Issues = "https://github.com/weir-hq/weir/issues"
 
 [project.scripts]
 weir-scraper = "weir_scraper.main:main"

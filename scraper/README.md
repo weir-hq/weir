@@ -1,60 +1,71 @@
-# Weir scraper
+# weir-scraper
 
-Reports the items **waiting between two stages**: how many, and how old the oldest one is. No code
-changes in the stages.
+Part of [Weir](https://weirhq.com). The scraper reports the items waiting **between** two
+stages of a pipeline, in a queue or a staging table: how many, and how old the oldest one is.
+It runs on its own, with no code changes in the stages.
 
-The SDK sees an item only while it is inside a stage. Once a stage sends it on, the item sits
-in a Kafka topic or a staging table, invisible until the next stage receives it. So a stopped
-consumer, or a cron that stopped running, used to show up only after it came back. The scraper
-asks those places directly, every few seconds, and sends the Weir server:
-
-| Metric | Meaning |
-|---|---|
-| `weir.item.waiting` | Items sent to the stage that it has not received yet |
-| `weir.item.oldest_waiting.age` | Age of the oldest of them, since birth. Climbs while nothing is received. |
-
-Both carry `weir.stage.name` (the receiving stage) and `weir.upstream_stage.name` (the sending
-stage), so each edge of the graph gets its own numbers.
-
-## Run
+The [Weir SDK](https://pypi.org/project/weir-sdk/) sees an item while a stage is handling it.
+In between, the item sits in a topic or a table until the next stage picks it up. The scraper
+looks there, so a stopped consumer or a cron job that stopped running shows up while it is
+stopped, not after it comes back.
 
 ```bash
+pip install weir-scraper
 weir-scraper scraper.toml
 ```
 
-See `src/weir_scraper/config.py` for the config format, and `demo/scraper.toml` for the demo's.
+Python 3.11+.
+
+## Configuration
+
+```toml
+pipeline = "orders"
+endpoint = "http://localhost:4100"   # or $WEIR_ENDPOINT
+interval_seconds = 5                 # per edge too; at most 60
+
+[kafka]
+bootstrap = "kafka:9092"
+
+[postgres]
+dsn = "postgresql://user:password@db:5432/app"
+timeout_seconds = 1
+
+# producer sends to enrich through the "orders" topic
+[[edge]]
+from = "producer"
+to = "enrich"
+kafka = { topic = "orders", group = "enrich" }
+
+# worker sends to aggregate through a staging table
+[[edge]]
+from = "worker"
+to = "aggregate"
+sql = "SELECT extract(epoch FROM min(event_time)) FROM staged_lines"
+interval_seconds = 15
+```
+
+`from` and `to` are the stage names your services pass to `weir.stage()`.
 
 ## Sources
 
-| Source | Waiting items | Oldest |
+| Source | Waiting items | Oldest item |
 |---|---|---|
-| `kafka = { topic, group }` | Messages after the consumer group's committed offsets. Includes messages read but not committed yet (e.g. a batcher's buffer). | Birth time from the `weirparent` header of the first waiting message per partition, else its produce timestamp |
-| `sql = "..."` | Not counted, except 0 when the query returns NULL (nothing waits) | Your query's one column: birth time in unix seconds, e.g. `SELECT extract(epoch FROM min(event_time)) FROM staging` |
+| `kafka = { topic, group }` | Messages after the consumer group's committed offsets. This includes messages read but not committed yet, so it is slightly high while the consumer is healthy. | Birth time from the Weir context of the first waiting message in each partition, else its produce time |
+| `sql = "..."` | Not counted (0 when the query returns NULL) | The query's single column: birth time in unix seconds, or NULL when nothing waits |
 
-Not yet: Celery/Redis queues, SQS, Pub/Sub, RabbitMQ.
+Not supported yet: Celery/Redis, SQS, Pub/Sub, RabbitMQ.
 
-## Keep the scrape cheap
+## Keeping table queries cheap
 
-Kafka costs nothing: the counts come from offsets the broker already keeps, and the scraper
-reads one message per partition for the age.
+- Don't use `count(*)`: it reads the whole table on every scrape.
+- Index the birth-time column, e.g. `CREATE INDEX ON staged_lines (event_time)`, so `min()`
+  reads one index entry. For an outbox, a partial index: `... WHERE processed = false`.
+- Every query runs with a statement timeout (`timeout_seconds`, default 1 s); a slow query is
+  cancelled and the edge skipped for that round.
+- Point `dsn` at a read replica to keep the load off the primary.
 
-A table needs care, because the scraper queries it every few seconds:
+## Links
 
-- **No `count(*)`.** It reads the whole table on every scrape. The oldest age already shows
-  whether anything is stuck and for how long, and the SDK's sent and received counts show how
-  many items are missing. Without a count, `transit` leaves `waiting` and `unaccounted` empty for
-  that edge instead of guessing.
-- **Index the birth-time column**, e.g. `CREATE INDEX ON staging (event_time)`, or a partial index
-  for an outbox: `... WHERE processed = false`. Postgres then answers `min()` by reading one index
-  entry, however big the table is. Without the index, `min()` reads the whole table too.
-- **Timeout.** Every query runs with `statement_timeout` (`[postgres] timeout_seconds`, default
-  1 s). A slower query is cancelled and the edge skipped for that round, so queries never pile up.
-- **Interval per edge.** `interval_seconds` on an `[[edge]]`, at most 60. An edge into a 5-minute
-  cron does not need checking every 5 s.
-- **A read replica** takes the load off the primary entirely: point `dsn` at it.
-
-## Develop
-
-```bash
-uv run --package weir-scraper pytest scraper/tests   # from the repo root
-```
+- [Weir repository](https://github.com/weir-hq/weir): server, SDK, demo
+- [Example config](https://github.com/weir-hq/weir/blob/main/demo/scraper.toml) from the demo pipeline
+- License: Apache-2.0
