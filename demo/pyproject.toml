@@ -1,0 +1,17 @@
+[project]
+name = "weir-demo"
+version = "0.1.0"
+description = "Instrumented demo pipeline for Weir, with fault injection and ground truth"
+requires-python = ">=3.12"
+dependencies = [
+    "weir-sdk",
+    "confluent-kafka==2.6.1",
+    "celery[redis]==5.4.0",
+    "psycopg[binary]==3.2.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+weir-sdk = { workspace = true }

@@ -1,0 +1,4 @@
+file_format: definition_manifest/2.0
+schema_url: https://weir.local/schemas/0.1.0
+description: Semantic conventions for Weir, the async-pipeline signal. The SDK and the server both follow these names.
+stability: development

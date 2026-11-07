@@ -1,0 +1,10 @@
+# uv workspace: `uv sync --all-packages` sets up the SDK and the demo in one .venv.
+[tool.uv.workspace]
+members = ["sdk/python", "scraper", "demo"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint.isort]
+# demo/services imports its shared helpers as `common`: a local module, not a package.
+known-first-party = ["common"]

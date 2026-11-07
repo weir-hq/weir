@@ -1,0 +1,30 @@
+# Edges the scraper watches: where items wait between two stages of the demo pipeline.
+pipeline = "orders"
+interval_seconds = 5
+
+[kafka]
+bootstrap = "kafka:9092"
+
+[postgres]
+dsn = "postgresql://weir:weir@postgres:5432/weir"
+timeout_seconds = 1
+
+[[edge]]
+from = "producer"
+to = "enrich"
+kafka = { topic = "orders", group = "enrich" }
+
+[[edge]]
+from = "enrich"
+to = "batcher"
+kafka = { topic = "lines", group = "batcher" }
+
+# batcher -> worker goes through a Celery queue on Redis: not supported by the scraper yet.
+
+# Only the oldest row, no count(*): with the index on event_time (sql/init.sql) this reads one
+# index entry, however big the table gets. The cron runs every 5 minutes, so every 15 s is plenty.
+[[edge]]
+from = "worker"
+to = "aggregate"
+sql = "SELECT extract(epoch FROM min(event_time)) FROM app.staged_lines"
+interval_seconds = 15

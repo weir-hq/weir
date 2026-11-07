@@ -1,0 +1,22 @@
+[project]
+name = "weir-sdk"
+version = "0.1.0"
+description = "Weir SDK: measure how items move through async pipelines"
+requires-python = ">=3.10"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/weir"]
+
+[tool.ruff]
+line-length = 120

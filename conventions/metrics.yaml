@@ -1,0 +1,200 @@
+groups:
+  - id: metric.weir.stage.attributes
+    type: attribute_group
+    stability: development
+    brief: Attributes on every Weir metric.
+    attributes:
+      - ref: weir.pipeline.name
+        requirement_level: required
+      - ref: weir.stage.name
+        requirement_level: required
+
+  # item counts
+  - id: metric.weir.stage.received.items
+    type: metric
+    metric_name: weir.stage.received.items
+    annotations:
+      code_generation:
+        metric_value_type: int
+    brief: Number of items the stage received from an upstream stage.
+    stability: development
+    instrument: counter
+    unit: "{item}"
+    extends: metric.weir.stage.attributes
+    attributes:
+      - ref: weir.upstream_stage.name
+        requirement_level: required
+
+  - id: metric.weir.stage.originated.items
+    type: metric
+    metric_name: weir.stage.originated.items
+    annotations:
+      code_generation:
+        metric_value_type: int
+    brief: Number of items born in the stage, with no upstream context.
+    stability: development
+    instrument: counter
+    unit: "{item}"
+    extends: metric.weir.stage.attributes
+
+  - id: metric.weir.stage.emitted.items
+    type: metric
+    metric_name: weir.stage.emitted.items
+    annotations:
+      code_generation:
+        metric_value_type: int
+    brief: Number of outputs the stage sent downstream.
+    note: >
+      One received item can emit many outputs (fan-out), and a batching stage emits fewer
+      outputs than it receives.
+    stability: development
+    instrument: counter
+    unit: "{item}"
+    extends: metric.weir.stage.attributes
+
+  - id: metric.weir.stage.completed.items
+    type: metric
+    metric_name: weir.stage.completed.items
+    annotations:
+      code_generation:
+        metric_value_type: int
+    brief: Number of items that left the stage, by outcome.
+    note: >
+      Received plus originated items, minus completed items, equals the items still active in
+      the stage. A gap between the two is unaccounted loss.
+    stability: development
+    instrument: counter
+    unit: "{item}"
+    extends: metric.weir.stage.attributes
+    attributes:
+      - ref: weir.item.outcome
+        requirement_level: required
+      - ref: weir.drop.reason
+        requirement_level:
+          conditionally_required: if `weir.item.outcome` is `dropped`.
+
+  - id: metric.weir.stage.retries
+    type: metric
+    metric_name: weir.stage.retries
+    annotations:
+      code_generation:
+        metric_value_type: int
+    brief: Number of times the stage retried handling an item.
+    stability: development
+    instrument: counter
+    unit: "{retry}"
+    extends: metric.weir.stage.attributes
+
+  - id: metric.weir.stage.context.errors
+    type: metric
+    metric_name: weir.stage.context.errors
+    annotations:
+      code_generation:
+        metric_value_type: int
+    brief: Number of items received with a `weirparent` header that could not be read.
+    note: >
+      Such an item is still counted as received, from upstream stage `?`, but its birth time is
+      unknown, so it is left out of `weir.item.age`.
+    stability: development
+    instrument: counter
+    unit: "{error}"
+    extends: metric.weir.stage.attributes
+
+  # durations
+  - id: metric.weir.stage.process.duration
+    type: metric
+    metric_name: weir.stage.process.duration
+    annotations:
+      code_generation:
+        metric_value_type: double
+    brief: Time from an item entering the stage until it left.
+    stability: development
+    instrument: histogram
+    unit: "s"
+    extends: metric.weir.stage.attributes
+
+  - id: metric.weir.item.age
+    type: metric
+    metric_name: weir.item.age
+    annotations:
+      code_generation:
+        metric_value_type: double
+    brief: Time since the item was born, measured as it entered or left the stage.
+    note: >
+      Age includes time spent waiting in queues between stages, which no span covers. The
+      difference between the exit age of one stage and the entry age of the next is transit time.
+    stability: development
+    instrument: histogram
+    unit: "s"
+    extends: metric.weir.stage.attributes
+    attributes:
+      - ref: weir.stage.boundary
+        requirement_level: required
+
+  # in-flight state
+  - id: metric.weir.item.active
+    type: metric
+    metric_name: weir.item.active
+    annotations:
+      code_generation:
+        metric_value_type: int
+    brief: Number of items inside the stage that have not left yet.
+    stability: development
+    instrument: updowncounter
+    unit: "{item}"
+    extends: metric.weir.stage.attributes
+
+  - id: metric.weir.item.oldest.age
+    type: metric
+    metric_name: weir.item.oldest.age
+    annotations:
+      code_generation:
+        metric_value_type: double
+    brief: Age of the oldest item still active in the stage.
+    note: Not reported while the stage has no active items. Climbs without bound for a stuck item.
+    stability: development
+    instrument: gauge
+    unit: "s"
+    extends: metric.weir.stage.attributes
+
+  # in transit: waiting between two stages
+  - id: metric.weir.item.waiting
+    type: metric
+    metric_name: weir.item.waiting
+    annotations:
+      code_generation:
+        metric_value_type: int
+    brief: Number of items sent to the stage by an upstream stage that the stage has not received yet.
+    note: >
+      Items waiting between two stages, such as messages in a Kafka topic, tasks in a queue or rows
+      in a staging table. Reported by whatever can see where the items wait, such as a broker or
+      database scraper, not by the stages themselves. For Kafka it counts the messages after the
+      consumer group's committed offsets, which includes messages the stage has read but not
+      committed yet. A source that cannot count cheaply, such as a large table, MAY report only
+      `weir.item.oldest_waiting.age`, and SHOULD report 0 when it knows nothing waits.
+    stability: development
+    instrument: updowncounter
+    unit: "{item}"
+    extends: metric.weir.stage.attributes
+    attributes:
+      - ref: weir.upstream_stage.name
+        requirement_level: required
+
+  - id: metric.weir.item.oldest_waiting.age
+    type: metric
+    metric_name: weir.item.oldest_waiting.age
+    annotations:
+      code_generation:
+        metric_value_type: double
+    brief: Age of the oldest item waiting to be received by the stage.
+    note: >
+      Measured from the item's birth, like `weir.item.age`. Not reported while nothing is waiting.
+      Climbs without bound while the stage receives nothing, so a stopped consumer or cron shows
+      up while it is stopped, not after it resumes.
+    stability: development
+    instrument: gauge
+    unit: "s"
+    extends: metric.weir.stage.attributes
+    attributes:
+      - ref: weir.upstream_stage.name
+        requirement_level: required

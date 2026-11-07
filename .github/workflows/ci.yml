@@ -1,0 +1,63 @@
+# Every check here is a Makefile target, so `make ci` reproduces a failure locally.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the run it replaces.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache: false # no external dependencies to cache
+      - name: gofmt and vet
+        run: |
+          test -z "$(gofmt -l server)" || { gofmt -l server; exit 1; }
+          cd server && go vet ./...
+      - name: Tests (race detector)
+        run: make test
+
+  python:
+    name: Python (SDK, scraper)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0 # setup-uv publishes exact versions only, no moving v10 tag
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Lockfile is up to date
+        run: uv lock --check
+      - name: Lint and format
+        run: |
+          uvx ruff@0.17.4 check .
+          uvx ruff@0.17.4 format --check .
+      - name: SDK tests
+        run: make test-sdk
+      - name: Scraper tests
+        run: make test-scraper
+      - name: SDK cost per message
+        # Generous limit: shared runners are slower and noisier than a laptop (about 3-5 us).
+        run: make bench-sdk MAX_US=25
+
+  conventions:
+    name: Conventions (Weaver)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Weaver registry check
+        run: make check-conventions

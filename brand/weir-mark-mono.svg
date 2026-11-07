@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Weir">
+  <!-- One color on a transparent background; the color comes from CSS `color`. -->
+  <path d="M10 17h9l13 20 13-20h9v24H10z" fill="currentColor"/>
+  <path d="M11 51c3.5-2.6 6.5-2.6 10.5 0s7 2.6 10.5 0 7-2.6 10.5 0 6.5 2.6 10.5 0" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/>
+</svg>

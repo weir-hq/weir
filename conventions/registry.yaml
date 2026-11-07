@@ -1,0 +1,70 @@
+groups:
+  - id: registry.weir
+    type: attribute_group
+    stability: development
+    display_name: Weir Attributes
+    brief: Attributes describing items moving through the stages of an async pipeline.
+    attributes:
+      - id: weir.pipeline.name
+        type: string
+        stability: development
+        brief: The pipeline the item belongs to, as passed to `weir.init`.
+        examples: ["orders", "ingest"]
+      - id: weir.stage.name
+        type: string
+        stability: development
+        brief: The stage reporting the measurement.
+        note: >
+          A stage is one step that receives items and emits zero or more outputs, such as a Kafka
+          consumer, a Celery task or a cron job. It SHOULD have low cardinality.
+        examples: ["enrich", "batcher"]
+      - id: weir.upstream_stage.name
+        type: string
+        stability: development
+        brief: The stage that emitted the item this stage received.
+        note: >
+          Read from the propagated context. `?` when the context does not name an upstream stage.
+        examples: ["producer", "enrich"]
+      - id: weir.item.outcome
+        type:
+          members:
+            - id: passed
+              value: "passed"
+              brief: The item emitted at least one output.
+              stability: development
+            - id: done
+              value: "done"
+              brief: Terminal success, such as being written to the sink.
+              stability: development
+            - id: dropped
+              value: "dropped"
+              brief: The item was dropped on purpose, with a `weir.drop.reason`.
+              stability: development
+            - id: errored
+              value: "errored"
+              brief: An exception escaped while the stage handled the item.
+              stability: development
+            - id: vanished
+              value: "vanished"
+              brief: The item left with no output and no outcome, a silent drop.
+              stability: development
+        stability: development
+        brief: How an item left a stage. Every received item ends in exactly one outcome.
+      - id: weir.drop.reason
+        type: string
+        stability: development
+        brief: Why the stage dropped the item. It SHOULD have low cardinality.
+        examples: ["duplicate", "invalid"]
+      - id: weir.stage.boundary
+        type:
+          members:
+            - id: entry
+              value: "entry"
+              brief: Measured when the item entered the stage.
+              stability: development
+            - id: exit
+              value: "exit"
+              brief: Measured when the item left the stage.
+              stability: development
+        stability: development
+        brief: Where in the stage a measurement was taken.

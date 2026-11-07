@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weir · track every item through your pipelines</title>
+<meta name="description" content="Weir counts items as they move through queues, batches and cron jobs, and shows which stage lost them, which are stuck, and where the time goes.">
+<meta property="og:title" content="Weir · track every item through your pipelines">
+<meta property="og:description" content="Weir counts items as they move through queues, batches and cron jobs, and shows which stage lost them, which are stuck, and where the time goes.">
+<meta property="og:url" content="https://weirhq.com">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0b6b73">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22 role=%22img%22 aria-label=%22Weir%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%230b6b73%22/%3E%3Cpath d=%22M10 17h9l13 20 13-20h9v24H10z%22 fill=%22%23ffffff%22/%3E%3Cpath d=%22M23.5 23.5h17L32 37z%22 fill=%22%239fe7e3%22/%3E%3Cpath d=%22M11 51c3.5-2.6 6.5-2.6 10.5 0s7 2.6 10.5 0 7-2.6 10.5 0 6.5 2.6 10.5 0%22 fill=%22none%22 stroke=%22%239fe7e3%22 stroke-width=%223.6%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #fbfbf9; --panel: #ffffff; --text: #16191d; --muted: #5c636b; --line: #e3e5e1;
+    --accent: #0b6b73; --accent-soft: #e3f3f2; --bad: #c2412d; --warn: #a86a0f; --ok: #2a7a4b;
+    --code-bg: #f2f3ef;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1214; --panel: #161a1d; --text: #e9ece9; --muted: #9aa3a8; --line: #262c30;
+      --accent: #5ccfc6; --accent-soft: #12302f; --bad: #f2735f; --warn: #e3a64b; --ok: #5fc78b;
+      --code-bg: #1b2023;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main, header, footer { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.86em; }
+
+  header { display: flex; align-items: center; gap: 10px; padding-top: 28px; }
+  .wordmark { font-weight: 700; font-size: 20px; letter-spacing: -0.01em; }
+  .header-link { margin-left: auto; font-size: 15px; text-decoration: none; }
+  .header-link:hover { text-decoration: underline; }
+
+  .hero { padding: 72px 0 32px; }
+  h1 { font-size: clamp(34px, 6vw, 54px); line-height: 1.08; letter-spacing: -0.025em; margin: 0 0 20px; max-width: 16ch; }
+  .lede { font-size: clamp(18px, 2.4vw, 21px); color: var(--muted); max-width: 40em; margin: 0; }
+
+  .diagram { margin: 40px 0 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 12px 10px; }
+  .diagram svg { display: block; width: 100%; height: auto; }
+  /* On a phone the whole pipeline would shrink to unreadable text: keep it legible and let it scroll. */
+  @media (max-width: 640px) {
+    .diagram { overflow-x: auto; }
+    .diagram svg { width: 620px; max-width: none; }
+  }
+  .caption { font-size: 13px; color: var(--muted); margin: 6px 6px 0; }
+  .diagram text { font-family: inherit; font-size: 15px; text-anchor: middle; }
+  .diagram .small { font-size: 13px; }
+  .diagram .strong { font-weight: 600; }
+  .diagram .t { fill: var(--text); }
+  .diagram .t-muted { fill: var(--muted); }
+  .diagram .t-bad { fill: var(--bad); }
+  .diagram .t-warn { fill: var(--warn); }
+  .diagram .node { fill: var(--panel); stroke: var(--ok); stroke-width: 1.5; }
+  .diagram .node.bad { stroke: var(--bad); stroke-width: 3; }
+  .diagram .edge { stroke: var(--muted); stroke-width: 2; }
+  .diagram .edge-warn { stroke: var(--warn); stroke-width: 3; }
+  .diagram .head { fill: var(--muted); }
+  .diagram .head-warn { fill: var(--warn); }
+
+  section { padding: 56px 0 8px; }
+  h2 { font-size: 28px; letter-spacing: -0.015em; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 28px; max-width: 42em; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+  .card h3 { font-size: 19px; line-height: 1.3; margin: 0 0 10px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
+
+  .how { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 28px; }
+  .how h3 { font-size: 17px; margin: 0 0 6px; }
+  .how p { margin: 0; color: var(--muted); font-size: 15.5px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px; overflow-x: auto; line-height: 1.55; margin: 28px 0 0;
+  }
+  .k { color: var(--accent); }
+
+  .contact { margin: 64px 0 0; background: var(--accent-soft); border-radius: 16px; padding: 32px; }
+  .contact h2 { margin-bottom: 10px; }
+  .contact p { margin: 0 0 12px; max-width: 40em; }
+  .contact p:last-child { margin-bottom: 0; }
+
+  footer { padding: 48px 20px 40px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0b6b73"/><path d="M10 17h9l13 20 13-20h9v24H10z" fill="#ffffff"/><path d="M23.5 23.5h17L32 37z" fill="#9fe7e3"/><path d="M11 51c3.5-2.6 6.5-2.6 10.5 0s7 2.6 10.5 0 7-2.6 10.5 0 6.5 2.6 10.5 0" fill="none" stroke="#9fe7e3" stroke-width="3.6" stroke-linecap="round"/></svg>
+  <span class="wordmark">Weir</span>
+  <a class="header-link" href="https://github.com/weir-hq">GitHub</a>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Know what happened to every item in your pipeline.</h1>
+    <p class="lede">
+      Weir counts items as they move through queues, batches and cron jobs. When something goes
+      missing, gets stuck, or takes longer than it should, it tells you which stage, and how many.
+    </p>
+
+    <figure class="diagram" aria-label="A five-stage pipeline: producer, enrich, batcher, worker, aggregate. Enrich is marked red: orders vanish there. The edge into enrich is amber with 1,599 orders waiting, the oldest 82 seconds old.">
+      <svg viewBox="0 0 900 170" role="img" aria-hidden="true">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path class="head" d="M0 0L10 5L0 10z"/>
+          </marker>
+          <marker id="arrow-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path class="head-warn" d="M0 0L10 5L0 10z"/>
+          </marker>
+        </defs>
+        <line class="edge edge-warn" x1="140" y1="62" x2="196" y2="62" marker-end="url(#arrow-warn)"/>
+        <line class="edge" x1="336" y1="62" x2="374" y2="62" marker-end="url(#arrow)"/>
+        <line class="edge" x1="514" y1="62" x2="552" y2="62" marker-end="url(#arrow)"/>
+        <line class="edge" x1="692" y1="62" x2="730" y2="62" marker-end="url(#arrow)"/>
+        <rect class="node" x="10" y="32" width="130" height="60" rx="10"/>
+        <text class="t" x="75" y="67">producer</text>
+        <rect class="node bad" x="200" y="32" width="136" height="60" rx="10"/>
+        <text class="t strong" x="268" y="58">enrich</text>
+        <text class="t-bad small strong" x="268" y="80">items vanish</text>
+        <rect class="node" x="378" y="32" width="136" height="60" rx="10"/>
+        <text class="t" x="446" y="67">batcher</text>
+        <rect class="node" x="556" y="32" width="136" height="60" rx="10"/>
+        <text class="t" x="624" y="67">worker</text>
+        <rect class="node" x="734" y="32" width="156" height="60" rx="10"/>
+        <text class="t" x="812" y="67">aggregate</text>
+        <text class="t-warn small strong" x="170" y="122">1,599 waiting</text>
+        <text class="t-warn small" x="170" y="140">oldest 82 s</text>
+        <text class="t-muted small" x="446" y="122">fan-out 1 → N</text>
+        <text class="t-muted small" x="624" y="122">batches of 500</text>
+        <text class="t-muted small" x="812" y="122">cron every 5 min</text>
+      </svg>
+      <figcaption class="caption">A demo pipeline: orders disappear at enrich, and a backlog builds up in front of it.</figcaption>
+    </figure>
+  </div>
+
+  <section>
+    <h2>What it found</h2>
+    <p class="sub">I tested Weir on a small demo pipeline (Kafka, Celery, Postgres and a cron job): I injected faults and compared what Weir reported with the pipeline's own records.</p>
+    <div class="cards">
+      <article class="card">
+        <h3>A batch stuck in retries</h3>
+        <p>One bad order made its batch retry forever. The retries were held in the worker's memory, so the queue length stayed at 0. Weir showed 500 orders sitting in the worker, the oldest over 10 minutes old.</p>
+      </article>
+      <article class="card">
+        <h3>Orders that disappeared</h3>
+        <p>A stage can drop messages without raising an error or writing a log line: an early return, a buggy filter, a swallowed exception. Lag and error rates look normal. Weir compares what goes into each stage with what comes out, so it shows which stage lost them and how many.</p>
+      </article>
+      <article class="card">
+        <h3>Waiting on a schedule</h3>
+        <p>Orders started taking three times longer to arrive while every service ran at its usual speed. Weir showed that 412 of the 416 seconds were spent waiting for a cron job.</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <div class="how">
+      <div>
+        <h3>An SDK in each service</h3>
+        <p>A few lines per stage. Each item is recorded when it arrives and when it leaves, along with how it left: sent on, finished, dropped, failed, or gone without any of those. A small header carries the item's creation time from stage to stage.</p>
+      </div>
+      <div>
+        <h3>A scraper for what's in between</h3>
+        <p>Items also wait outside your services, in queues and staging tables. The scraper checks those from the outside, so a backlog shows up while it builds, with no code changes.</p>
+      </div>
+      <div>
+        <h3>Low overhead</h3>
+        <p>Only totals leave the process, every few seconds: about 4 µs per message and under 1 KB/s of traffic, whatever the volume. Metric names follow OpenTelemetry's semantic conventions.</p>
+      </div>
+    </div>
+<pre><code><span class="k">import</span> weir
+
+weir.init(pipeline=<span class="k">"orders"</span>)
+enrich = weir.stage(<span class="k">"enrich"</span>)
+
+<span class="k">with</span> enrich.receive(weir.extract(msg.headers())) <span class="k">as</span> item:
+    <span class="k">for</span> line <span class="k">in</span> split(msg):
+        producer.produce(<span class="k">"lines"</span>, line, headers=weir.inject(item.emit()))</code></pre>
+  </section>
+
+  <div class="contact">
+    <h2>Status</h2>
+    <p>Weir is early. I'm looking for a few teams to run it on a real pipeline, especially with Kafka, Celery or cron jobs.</p>
+    <p>Follow it on GitHub: <a href="https://github.com/weir-hq">github.com/weir-hq</a> (Apache-2.0).</p>
+    <p>Daniel Schafman</p>
+  </div>
+</main>
+
+<footer>
+  <span>© 2026 Daniel Schafman</span>
+  <span>Apache-2.0</span>
+  <a href="https://github.com/weir-hq">GitHub</a>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,26 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Go: local `go build` output (the image builds its own)
+/server/server
+/server/weir-server
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Private notes, kept locally
+CLAUDE.local.md
+NEXT_STEPS.md
