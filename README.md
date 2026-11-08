@@ -15,8 +15,6 @@ Weir answers four questions for any async pipeline, end to end:
 | **Where does time go?** | Working vs. queueing vs. waiting for a batch window / schedule |
 | **What happened to *this* record?** | Sampled per-key lineage across hops and batches |
 
-See [ROADMAP.md](ROADMAP.md) for what comes next.
-
 ## Quick start
 
 Requirements: Docker with Compose (`docker compose` or `docker-compose`) and `make`.
