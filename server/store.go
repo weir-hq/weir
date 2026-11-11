@@ -2,6 +2,7 @@ package main
 
 import (
 	"math"
+	"sort"
 	"sync"
 	"time"
 )
@@ -394,6 +395,24 @@ func (s *Store) gc() {
 }
 
 // Select returns the series matching every matcher. Callers must hold s.mu.
+// LabelValues lists the distinct values of a label over the series that match ms.
+func (s *Store) LabelValues(label string, ms []Matcher) []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	seen := map[string]bool{}
+	for _, sr := range s.Select(ms) {
+		if v := sr.Label(label); v != "" {
+			seen[v] = true
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for v := range seen {
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func (s *Store) Select(ms []Matcher) []*Series {
 	var out []*Series
 	for _, sr := range s.series {

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "datasource",
+  "name": "Weir",
+  "id": "weirhq-weir-datasource",
+  "metrics": true,
+  "alerting": true,
+  "backend": true,
+  "executable": "gpx_weir",
+  "info": {
+    "description": "Query Weir with WeirQL: stuck, late and lost items in async pipelines (queues, batches, workflows, ETLs).",
+    "author": {
+      "name": "Weir",
+      "url": "https://weirhq.com"
+    },
+    "keywords": ["datasource", "weir", "pipelines", "queues", "kafka", "async", "etl", "observability"],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [
+      { "name": "Website", "url": "https://weirhq.com" },
+      { "name": "Source code", "url": "https://github.com/weir-hq/weir/tree/main/grafana-plugin" },
+      { "name": "License", "url": "https://github.com/weir-hq/weir/blob/main/LICENSE" }
+    ],
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "includes": [
+    {
+      "type": "dashboard",
+      "name": "Weir pipeline",
+      "path": "dashboards/pipeline.json"
+    }
+  ],
+  "dependencies": {
+    "grafanaDependency": ">=13.2.0",
+    "plugins": []
+  }
+}

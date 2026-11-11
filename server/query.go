@@ -20,8 +20,9 @@ type Result struct {
 }
 
 type SeriesOut struct {
-	Name   string  `json:"name"`
-	Points [][]any `json:"points"` // [unix ms, value|null]
+	Name   string            `json:"name"`
+	Labels map[string]string `json:"labels"` // pipeline, stage, and upstream for edge series
+	Points [][]any           `json:"points"` // [unix ms, value|null]
 }
 
 type NodeOut struct {
@@ -444,7 +445,10 @@ func edgeSeriesFunc(unit string, value func(wt Wait, end int64) float64) func(*e
 			}
 			sort.Strings(names)
 			for _, up := range names {
-				s := SeriesOut{Name: up + " → " + e.name(n)}
+				s := SeriesOut{
+					Name:   up + " → " + e.name(n),
+					Labels: map[string]string{"pipeline": n.sr.Pipeline, "stage": n.sr.Stage, "upstream": up},
+				}
 				for t := windowStart(float64(e.from)); t < e.to; t += windowSeconds {
 					var v any
 					if w := n.sr.Windows[t]; w != nil && len(w.Waiting) > 0 {
@@ -484,7 +488,7 @@ func seriesFunc(unit string, value func(e *evalCtx, w *Window, end int64) float6
 		nodes, _ := e.nodes()
 		res := &Result{Type: "series", Unit: unit}
 		for _, n := range nodes {
-			s := SeriesOut{Name: e.name(n)}
+			s := SeriesOut{Name: e.name(n), Labels: map[string]string{"pipeline": n.sr.Pipeline, "stage": n.sr.Stage}}
 			for t := windowStart(float64(e.from)); t < e.to; t += windowSeconds {
 				var v any
 				if w := n.sr.Windows[t]; w != nil {

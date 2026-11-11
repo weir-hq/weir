@@ -54,6 +54,23 @@ jobs:
         # Generous limit: shared runners are slower and noisier than a laptop (about 3-5 us).
         run: make bench-sdk MAX_US=25
 
+  grafana-plugin:
+    name: Grafana plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: grafana-plugin/go.mod
+          cache-dependency-path: grafana-plugin/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: grafana-plugin/.nvmrc
+          cache: npm
+          cache-dependency-path: grafana-plugin/package-lock.json
+      - name: Backend and frontend checks
+        run: make test-plugin
+
   conventions:
     name: Conventions (Weaver)
     runs-on: ubuntu-latest

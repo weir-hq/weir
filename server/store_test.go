@@ -84,3 +84,42 @@ func TestSemconvMatchesConventions(t *testing.T) {
 		}
 	}
 }
+
+func TestLabelValuesAndSeriesLabels(t *testing.T) {
+	s := NewStore()
+	s.lastGC = time.Now()
+	one := 1.0
+	for _, stage := range []string{"enrich", "batcher"} {
+		s.Ingest(IngestPayload{
+			TimeUnixNano: 1000000000000,
+			Metrics: []Point{{
+				Name:       "weir.item.active",
+				Attributes: map[string]string{"weir.pipeline.name": "orders", "weir.stage.name": stage},
+				Value:      &one,
+			}},
+		})
+	}
+	if got := s.LabelValues("stage", []Matcher{{Label: "pipeline", Op: "=", Value: "orders"}}); strings.Join(got, ",") != "batcher,enrich" {
+		t.Fatalf("stage values = %v", got)
+	}
+	if got := s.LabelValues("stage", []Matcher{{Label: "pipeline", Op: "=", Value: "other"}}); len(got) != 0 {
+		t.Fatalf("stage values for unknown pipeline = %v", got)
+	}
+
+	q, err := Parse(`in_flight({pipeline="orders"})`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Execute(s, q, 990, 1010)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Series) != 2 {
+		t.Fatalf("got %d series, want 2", len(res.Series))
+	}
+	for _, sr := range res.Series {
+		if sr.Labels["pipeline"] != "orders" || sr.Labels["stage"] != sr.Name {
+			t.Fatalf("labels = %v for %q", sr.Labels, sr.Name)
+		}
+	}
+}

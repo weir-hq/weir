@@ -8,9 +8,9 @@ RUFF := uvx ruff@0.17.4
 %:
 	@$(MAKE) --no-print-directory -C demo $@
 
-.PHONY: ci lint test test-sdk test-scraper bench-sdk check-conventions
+.PHONY: ci lint test test-sdk test-scraper bench-sdk check-conventions test-plugin
 
-ci: lint test test-sdk test-scraper bench-sdk check-conventions  ## Everything CI checks
+ci: lint test test-sdk test-scraper bench-sdk check-conventions test-plugin  ## Everything CI checks
 
 lint:          ## Go: gofmt + vet. Python: ruff lint + format check
 	@cd server && test -z "$$(gofmt -l .)" || { gofmt -l .; echo "fix with: gofmt -w server"; exit 1; }
@@ -33,3 +33,8 @@ bench-sdk:     ## SDK cost per message, no broker or network. Fails above MAX_US
 check-conventions:  ## Validate conventions/ with OpenTelemetry Weaver
 	docker run --rm --mount type=bind,source=$(CURDIR)/conventions,target=/home/weaver/source,readonly \
 		otel/weaver:v0.28.0 registry check --registry=/home/weaver/source
+
+test-plugin:   ## Grafana plugin: Go backend (gofmt, vet, tests), frontend (types, lint, tests, build)
+	@cd grafana-plugin && test -z "$$(gofmt -l pkg)" || { gofmt -l pkg; echo "fix with: gofmt -w grafana-plugin/pkg"; exit 1; }
+	cd grafana-plugin && go vet ./... && go test -race ./...
+	cd grafana-plugin && npm ci --no-audit --no-fund && npm run typecheck && npm run lint && npm run test:ci && npm run build

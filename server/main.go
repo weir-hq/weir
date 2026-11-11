@@ -48,6 +48,15 @@ func main() {
 	mux.HandleFunc("GET /api/functions", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, FunctionNames())
 	})
+	// Values of one label, for dashboard variables. Other query parameters filter by equality,
+	// e.g. /api/labels/stage/values?pipeline=orders.
+	mux.HandleFunc("GET /api/labels/{name}/values", func(w http.ResponseWriter, r *http.Request) {
+		var ms []Matcher
+		for k, vs := range r.URL.Query() {
+			ms = append(ms, Matcher{Label: k, Op: "=", Value: vs[0]})
+		}
+		writeJSON(w, http.StatusOK, store.LabelValues(r.PathValue("name"), ms))
+	})
 	mux.Handle("GET /", http.FileServerFS(ui))
 
 	log.Printf("Weir server listening on %s", *addr)

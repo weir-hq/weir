@@ -1,0 +1,10 @@
+apiVersion: 1
+
+datasources:
+  - name: Weir
+    type: weirhq-weir-datasource
+    uid: weir
+    access: proxy
+    url: http://host.docker.internal:4100
+    isDefault: true
+    editable: true

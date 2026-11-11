@@ -1,0 +1,329 @@
+{
+  "title": "Weir pipeline",
+  "uid": "weir-pipeline",
+  "tags": ["weir"],
+  "editable": true,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Data source",
+        "type": "datasource",
+        "query": "weirhq-weir-datasource",
+        "current": {},
+        "hide": 0,
+        "refresh": 1
+      },
+      {
+        "name": "pipeline",
+        "label": "Pipeline",
+        "type": "query",
+        "datasource": {
+          "type": "weirhq-weir-datasource",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(pipeline)",
+        "definition": "label_values(pipeline)",
+        "refresh": 1,
+        "sort": 1,
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "multi": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Pipeline",
+      "description": "Stages and edges over the last 5 minutes. Red: items vanished or errored, or unaccounted. Amber: old items in flight, or old items waiting on an edge.",
+      "type": "nodeGraph",
+      "datasource": {
+        "type": "weirhq-weir-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 11
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "weirhq-weir-datasource",
+            "uid": "${datasource}"
+          },
+          "expr": "graph({pipeline=\"$pipeline\"}[5m])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "title": "Oldest item in flight",
+      "description": "Age of the oldest item still in each stage. A line that keeps climbing is a stuck item.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "weirhq-weir-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "weirhq-weir-datasource",
+            "uid": "${datasource}"
+          },
+          "expr": "oldest({pipeline=\"$pipeline\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Lost items",
+      "description": "Items that vanished (never closed) or errored, per second.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "weirhq-weir-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 11,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "weirhq-weir-datasource",
+            "uid": "${datasource}"
+          },
+          "expr": "lost({pipeline=\"$pipeline\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix:/s",
+          "custom": {
+            "spanNulls": false,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Throughput",
+      "description": "Items entering each stage per second.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "weirhq-weir-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "weirhq-weir-datasource",
+            "uid": "${datasource}"
+          },
+          "expr": "throughput({pipeline=\"$pipeline\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix:/s",
+          "custom": {
+            "spanNulls": false,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Item age at exit, p99",
+      "description": "Age of items (now minus their origin event time) when they leave each stage.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "weirhq-weir-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 19,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "weirhq-weir-datasource",
+            "uid": "${datasource}"
+          },
+          "expr": "age({pipeline=\"$pipeline\"}, 0.99)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Conservation",
+      "description": "Per stage over the dashboard range: in = passed + done + dropped + vanished + errored + change in in-flight. Anything else is unaccounted.",
+      "type": "table",
+      "datasource": {
+        "type": "weirhq-weir-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "weirhq-weir-datasource",
+            "uid": "${datasource}"
+          },
+          "expr": "leak({pipeline=\"$pipeline\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "title": "Waiting between stages",
+      "description": "Per edge, from the Weir scraper: items waiting in a topic or table now, the oldest one's age, and items lost in between.",
+      "type": "table",
+      "datasource": {
+        "type": "weirhq-weir-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "weirhq-weir-datasource",
+            "uid": "${datasource}"
+          },
+          "expr": "transit({pipeline=\"$pipeline\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    }
+  ],
+  "annotations": {
+    "list": []
+  }
+}
