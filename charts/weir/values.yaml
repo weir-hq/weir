@@ -1,0 +1,79 @@
+# Weir server. The server keeps its data in memory and runs as a single replica: two replicas
+# would each see only part of the reports. A restart clears the data; senders refill it.
+
+image:
+  repository: ghcr.io/weir-hq/weir-server
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  # Generated from the release name if empty.
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+service:
+  type: ClusterIP
+  # SDKs and the scraper send to http://<release>-weir:<port>; Grafana and the UI read from it.
+  port: 4100
+  annotations: {}
+
+# The server has no authentication yet. Only expose it on a private network, or put
+# authentication in front of it (for example with ingress annotations).
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: weir.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: weir-tls
+  #    hosts: [weir.example.com]
+
+# Memory grows with the number of stages and the 15 minutes of history the server keeps.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 512Mi
+
+# Extra command-line flags for weir-server.
+extraArgs: []
+extraEnv: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+priorityClassName: ""
+
+# The pod used by `helm test`.
+test:
+  image:
+    repository: curlimages/curl
+    tag: "8.23.0"

@@ -1,0 +1,43 @@
+# `helm test`: the server is up, takes a report, and answers a query with it.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "weir.fullname" . }}-test
+  labels:
+    {{- include "weir.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: test
+      image: {{ .Values.test.image.repository }}:{{ .Values.test.image.tag }}
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      env:
+        - name: WEIR
+          value: http://{{ include "weir.fullname" . }}:{{ .Values.service.port }}
+      command: [sh, -ec]
+      args:
+        - |
+          # Retries cover cluster DNS that is still starting on a fresh cluster.
+          curl -fsS --retry 15 --retry-delay 2 --retry-all-errors "$WEIR/healthz"
+          now=$(date +%s)
+          curl -fsS -X POST "$WEIR/ingest" -H 'Content-Type: application/json' -d '{
+            "resource": {"service.name": "helm-test", "service.instance.id": "helm-test"},
+            "time_unix_nano": '"$now"'000000000,
+            "metrics": [{"name": "weir.item.active",
+              "attributes": {"weir.pipeline.name": "helm-test", "weir.stage.name": "check"}, "value": 1}]
+          }'
+          curl -fsS -G "$WEIR/api/labels/stage/values" --data-urlencode pipeline=helm-test | tee /dev/stderr | grep -q '"check"'
+          echo "ingest and query work"

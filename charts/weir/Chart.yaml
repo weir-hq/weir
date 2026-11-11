@@ -1,0 +1,20 @@
+apiVersion: v2
+name: weir
+description: Weir server. Tracks every item through async pipelines (queues, batches, workflows, ETLs).
+type: application
+# The chart version follows the server's, so `helm install --version X` gives server X.
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.25.0-0"
+home: https://weirhq.com
+icon: https://raw.githubusercontent.com/weir-hq/weir/main/brand/png/weir-mark-512.png
+sources:
+  - https://github.com/weir-hq/weir
+keywords:
+  - observability
+  - pipelines
+  - kafka
+  - queues
+  - etl
+annotations:
+  artifacthub.io/license: Apache-2.0

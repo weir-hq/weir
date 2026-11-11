@@ -8,9 +8,9 @@ RUFF := uvx ruff@0.17.4
 %:
 	@$(MAKE) --no-print-directory -C demo $@
 
-.PHONY: ci lint test test-sdk test-scraper bench-sdk check-conventions test-plugin
+.PHONY: ci lint test test-sdk test-scraper bench-sdk check-conventions test-plugin test-chart
 
-ci: lint test test-sdk test-scraper bench-sdk check-conventions test-plugin  ## Everything CI checks
+ci: lint test test-sdk test-scraper bench-sdk check-conventions test-plugin test-chart  ## Everything CI checks
 
 lint:          ## Go: gofmt + vet. Python: ruff lint + format check
 	@cd server && test -z "$$(gofmt -l .)" || { gofmt -l .; echo "fix with: gofmt -w server"; exit 1; }
@@ -38,3 +38,7 @@ test-plugin:   ## Grafana plugin: Go backend (gofmt, vet, tests), frontend (type
 	@cd grafana-plugin && test -z "$$(gofmt -l pkg)" || { gofmt -l pkg; echo "fix with: gofmt -w grafana-plugin/pkg"; exit 1; }
 	cd grafana-plugin && go vet ./... && go test -race ./...
 	cd grafana-plugin && npm ci --no-audit --no-fund && npm run typecheck && npm run lint && npm run test:ci && npm run build
+
+test-chart:    ## Helm chart: lint, then install in a throwaway kind cluster and run helm test
+	helm lint --strict charts/weir
+	./charts/test.sh

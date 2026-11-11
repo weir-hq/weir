@@ -35,6 +35,15 @@ make reset                      # stop and wipe everything
 
 Other faults: `make reset && make up FAULT=drop|stall|schedule|dup|poison`. See [demo/README.md](demo/README.md).
 
+## Deploy on Kubernetes
+
+```bash
+helm install weir oci://ghcr.io/weir-hq/charts/weir --namespace weir --create-namespace
+```
+
+Services then send to `WEIR_ENDPOINT=http://weir.weir.svc:4100`. See [charts/weir](charts/weir/README.md).
+The chart and the `ghcr.io/weir-hq/weir-server` image are published from the first release on.
+
 ## Queries to try
 
 | Query | What to look for |
@@ -59,6 +68,8 @@ scraper/             Zero-code scraper: items waiting between stages (Kafka topi
 sdk/python/          Python SDK (src/weir): context propagation (weirparent header) + running totals, exported every 5 s
 server/              Go server: ingest, in-memory store, WeirQL parser/executor, embedded UI
 demo/                Instrumented demo pipeline with fault injection and ground truth
+charts/weir/         Helm chart for the server
+grafana-plugin/      Grafana data source: WeirQL in dashboards and alerts
 ```
 
 ## Developing

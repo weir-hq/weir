@@ -71,6 +71,18 @@ jobs:
       - name: Backend and frontend checks
         run: make test-plugin
 
+  chart:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5.1.0
+      - uses: helm/kind-action@v1.15.2
+        with:
+          install_only: true
+      - name: Lint, install in kind, helm test
+        run: make test-chart
+
   conventions:
     name: Conventions (Weaver)
     runs-on: ubuntu-latest

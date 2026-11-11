@@ -57,6 +57,9 @@ func main() {
 		}
 		writeJSON(w, http.StatusOK, store.LabelValues(r.PathValue("name"), ms))
 	})
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok\n"))
+	})
 	mux.Handle("GET /", http.FileServerFS(ui))
 
 	log.Printf("Weir server listening on %s", *addr)

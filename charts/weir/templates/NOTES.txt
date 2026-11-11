@@ -1,0 +1,22 @@
+Weir server {{ .Chart.AppVersion }} is running.
+
+Send reports to (set WEIR_ENDPOINT in your services):
+
+  http://{{ include "weir.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}
+
+{{- if .Values.ingress.enabled }}
+
+UI:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+
+Open the UI:
+
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "weir.fullname" . }} {{ .Values.service.port }}
+  open http://localhost:{{ .Values.service.port }}
+{{- end }}
+
+The server has no authentication yet: keep it on a private network.
+Data is kept in memory; a restart clears it and senders refill it within a minute.
